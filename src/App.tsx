@@ -1,13 +1,15 @@
-import { MoreHorizontal, Filter, Plus, Search } from 'lucide-react'
+import { Plus, Search, Filter, FileDown, MoreHorizontal, Loader2 } from 'lucide-react'
 import { Header } from './components/header'
 import { Tabs } from './components/tabs'
 import { Button } from './components/ui/button'
 import { Control, Input } from './components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table'
 import { Pagination } from './components/pagination'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { useState } from 'react'
+import { FormEvent, useState } from 'react'
+import * as Dialog from '@radix-ui/react-dialog';
+import { CreateTagForm } from './components/create-tag-form'
 
 export interface TagResponse {
   first: number
@@ -21,6 +23,7 @@ export interface TagResponse {
 
 export interface Tag {
   title: string
+  slug: string
   amountOfVideos: number
   id: string
 }
@@ -28,12 +31,12 @@ export interface Tag {
 export function App() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlFilter = searchParams.get('filter') ?? ''
-
+  
   const [filter, setFilter] = useState(urlFilter)
 
   const page = searchParams.get('page') ? Number(searchParams.get('page')) : 1
 
-  const { data: tagsResponse, isLoading } = useQuery<TagResponse>({
+  const { data: tagsResponse, isLoading, isFetching } = useQuery<TagResponse>({
     queryKey: ['get-tags', urlFilter, page],
     queryFn: async () => {
       const response = await fetch(`http://localhost:3333/tags?_page=${page}&_per_page=10&title=${urlFilter}`)
@@ -44,7 +47,9 @@ export function App() {
     placeholderData: keepPreviousData,
   })
 
-  function handleFilter() {
+  function handleFilter(event: FormEvent) {
+    event.preventDefault()
+
     setSearchParams(params => {
       params.set('page', '1')
       params.set('filter', filter)
@@ -64,16 +69,39 @@ export function App() {
         <Tabs />
       </div>
       <main className="max-w-6xl mx-auto space-y-5">
-        <div className='flex items-center gap-3'>
+        <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold">Tags</h1>
-          <Button variant='primary'>
-            <Plus className='size-3' />
-            Create New
-          </Button>
+
+          <Dialog.Root>
+            <Dialog.Trigger asChild>
+              <Button variant='primary'>
+                <Plus className="size-3" />
+                Create new
+              </Button>
+            </Dialog.Trigger>
+
+            <Dialog.Portal>
+              <Dialog.Overlay className="fixed inset-0 bg-black/70" />
+              <Dialog.Content className="fixed space-y-10 p-10 right-0 top-0 bottom-0 h-screen min-w-[320px] z-10 bg-zinc-950 border-l border-zinc-900">
+                <div className="space-y-3">
+                  <Dialog.Title className="text-xl font-bold">
+                    Create tag
+                  </Dialog.Title>
+                  <Dialog.Description className="text-sm text-zinc-500">
+                    Tags can be used to group videos about similar concepts.
+                  </Dialog.Description>
+                </div>
+
+                <CreateTagForm />
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
+
+          {isFetching && <Loader2 className="size-4 animate-spin text-zinc-500" />}
         </div>
 
-        <div className='flex items-center justify-between'>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between">
+          <form onSubmit={handleFilter} className="flex items-center gap-2">
             <Input variant='filter'>
               <Search className="size-3" />
               <Control 
@@ -82,14 +110,14 @@ export function App() {
                 value={filter}
               />
             </Input>
-            <Button onClick={handleFilter}>
+            <Button type="submit">
               <Filter className="size-3" />
-              Filter
+              Apply filters
             </Button>
-          </div>
+          </form>
 
-          <Button onClick={handleFilter}>
-            <Filter className='size-3' />
+          <Button>
+            <FileDown className="size-3" />
             Export
           </Button>
         </div>
@@ -100,6 +128,7 @@ export function App() {
               <TableHead></TableHead>
               <TableHead>Tag</TableHead>
               <TableHead>Amount of videos</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -108,17 +137,17 @@ export function App() {
                 <TableRow key={tag.id}>
                   <TableCell></TableCell>
                   <TableCell>
-                    <div className='flex flex-col'>
-                      <span className='font-medium'>{tag.title}</span>
-                      <span className='text-xs text-zinc-500'>{tag.id}</span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium">{tag.title}</span>
+                      <span className="text-xs text-zinc-500">{tag.slug}</span>
                     </div>
                   </TableCell>
-                  <TableCell className='text-zinc-300'>
-                    {tag.amountOfVideos} videos(s)
+                  <TableCell className="text-zinc-300">
+                    {tag.amountOfVideos} video(s)
                   </TableCell>
-                  <TableCell className='text-right'>
-                    <Button size='icon'>
-                      <MoreHorizontal className='size-4' />
+                  <TableCell className="text-right">
+                    <Button size="icon">
+                      <MoreHorizontal className="size-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -126,7 +155,7 @@ export function App() {
             })}
           </TableBody>
         </Table>
-        
+
         {tagsResponse && <Pagination pages={tagsResponse.pages} items={tagsResponse.items} page={page} />}
       </main>
     </div>
